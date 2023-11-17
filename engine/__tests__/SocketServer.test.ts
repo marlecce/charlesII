@@ -3,7 +3,7 @@ import { SocketServer } from "../src/server/SocketServer";
 
 describe("SocketServer", () => {
     let server: SocketServer;
-    const port = 3001; // Use a different port for testing
+    const port = 3001;
 
     beforeAll(() => {
         server = new SocketServer(port);
