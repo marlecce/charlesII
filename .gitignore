@@ -9,6 +9,7 @@ lerna-debug.log*
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+*audit.json
 
 # Runtime data
 pids
@@ -39,7 +40,7 @@ bower_components
 build/Release
 
 # Dependency directories
-node_modules/
+**/node_modules/
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
@@ -74,9 +75,9 @@ web_modules/
 
 # dotenv environment variable files
 .env
-.env.development.local
-.env.test.local
-.env.production.local
+.env.development
+.env.test
+.env.production
 .env.local
 
 # parcel-bundler cache (https://parceljs.org/)
