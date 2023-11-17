@@ -9,21 +9,21 @@ dotenv.config({ path: path.resolve(process.cwd(), envPath) });
 import { Config } from "./Config";
 
 function handleError(error: unknown) {
-  if (error instanceof Error) {
-    logger.error(error.message);
-  } else {
-    logger.error("An unexpected error occurred");
-  }
-  process.exit(1);
+    if (error instanceof Error) {
+        logger.error(error.message);
+    } else {
+        logger.error("An unexpected error occurred");
+    }
+    process.exit(1);
 }
 
 function run() {
-  try {
-    const config = new Config();
-    logger.info(`Application is running in "${config.nodeEnv}"!`);
-  } catch (error) {
-    handleError(error);
-  }
+    try {
+        const config = new Config();
+        logger.info(`Application is running in "${config.nodeEnv}"!`);
+    } catch (error) {
+        handleError(error);
+    }
 }
 
 run();
