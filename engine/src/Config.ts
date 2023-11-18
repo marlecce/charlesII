@@ -6,7 +6,7 @@ export class Config {
     constructor() {
         this.nodeEnv = process.env.NODE_ENV || "";
         this.chatGptApiKey = process.env.CHATGPT_API_KEY || "";
-        this.socketServerPort = parseInt(process.env.SOCKET_SERVER_PORT || "3000");
+        this.socketServerPort = parseInt(process.env.SOCKET_SERVER_PORT || "");
 
         this.validateEnvVariables();
     }
