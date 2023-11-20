@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import { SocketServer } from "../src/server/SocketServer";
+import { delay } from "../src/utils/Helpers";
 
 describe("SocketServer", () => {
     let server: SocketServer;
@@ -13,16 +14,40 @@ describe("SocketServer", () => {
         await server.close();
     });
 
-    test("should echo messages", (done) => {
+    it("should establish a connection with the server", (done) => {
         const client = new WebSocket(`ws://localhost:${port}`);
 
         client.on("open", () => {
-            client.send("Hello, server!");
+            expect(client.readyState).toBe(WebSocket.OPEN);
+            client.close();
+            done();
+        });
+    });
+
+    it("should handle client disconnection", (done) => {
+        const client = new WebSocket(`ws://localhost:${port}`);
+
+        client.on("open", () => {
+            client.close();
         });
 
-        client.on("message", (data) => {
-            expect(data.toString()).toBe("Echo: Hello, server!");
+        client.on("close", () => {
+            done();
+        });
+    });
+
+    it("should respond correctly to a specific client message", (done) => {
+        const client = new WebSocket(`ws://localhost:${port}`);
+
+        client.on("open", () => {
+            client.send("Specific message");
+        });
+
+        client.on("message", async (data) => {
+            expect(data.toString()).toBe("The output from the model: hello there!");
             client.close();
+
+            await delay(500);
             done();
         });
     });

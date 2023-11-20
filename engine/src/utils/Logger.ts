@@ -10,17 +10,14 @@ const dailyRotateTransport = new DailyRotateFile({
 });
 
 const logger = winston.createLogger({
-    level: "info",
+    level: process.env.NODE_ENV === "test" || process.env.NODE_ENV === "development" ? "debug" : "info",
     format: winston.format.combine(winston.format.timestamp(), winston.format.simple()),
     transports: [
         dailyRotateTransport,
         new winston.transports.File({ filename: "error.log", level: "error" }),
-        new winston.transports.File({ filename: "combined.log" }),
-        new winston.transports.File({
-            filename: "exceptions.log",
-            handleExceptions: true
-        })
-    ]
+        new winston.transports.File({ filename: "combined.log" })
+    ],
+    exceptionHandlers: [new winston.transports.File({ filename: "exceptions.log" })]
 });
 
 if (process.env.NODE_ENV !== "production") {

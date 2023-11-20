@@ -42,13 +42,13 @@ describe("Config", () => {
         }).toThrow("Environment variable CHATGPT_API_KEY is missing");
     });
 
-    it("sshould throw an error if SOCKET_SERVER_PORT is missing", () => {
+    it("should throw an error if SOCKET_SERVER_PORT is missing", () => {
         process.env.NODE_ENV = "development";
         process.env.SOCKET_SERVER_PORT = "";
         process.env.CHATGPT_API_KEY = "some_api_key";
 
         expect(() => {
             new Config();
-        }).not.toThrow();
+        }).toThrow("Environment variable SOCKET_SERVER_PORT is not a valid number");
     });
 });
