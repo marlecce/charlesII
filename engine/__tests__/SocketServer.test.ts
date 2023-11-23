@@ -4,7 +4,7 @@ import { delay } from "../src/utils/Helpers";
 
 describe("SocketServer", () => {
     let server: SocketServer;
-    const port = 3001;
+    const port = parseInt(process.env.SOCKET_SERVER_PORT || "");
 
     beforeAll(() => {
         server = new SocketServer(port);
