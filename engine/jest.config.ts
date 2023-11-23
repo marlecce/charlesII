@@ -2,6 +2,7 @@
 module.exports = {
     preset: "ts-jest",
     testEnvironment: "node",
+    setupFiles: ["<rootDir>/jest.setup.ts"],
     // Paths to files that Jest should test
     testMatch: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[tj]s?(x)"],
     // Coverage configuration

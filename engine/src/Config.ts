@@ -1,11 +1,9 @@
 export class Config {
     public readonly nodeEnv: string;
-    public readonly chatGptApiKey: string;
     public readonly socketServerPort: number;
 
     constructor() {
         this.nodeEnv = process.env.NODE_ENV || "";
-        this.chatGptApiKey = process.env.CHATGPT_API_KEY || "";
         this.socketServerPort = parseInt(process.env.SOCKET_SERVER_PORT || "");
 
         this.validateEnvVariables();
@@ -14,7 +12,6 @@ export class Config {
     private validateEnvVariables(): void {
         const requiredEnvVars: { [key: string]: string | number } = {
             NODE_ENV: this.nodeEnv,
-            CHATGPT_API_KEY: this.chatGptApiKey,
             SOCKET_SERVER_PORT: this.socketServerPort
         };
 
