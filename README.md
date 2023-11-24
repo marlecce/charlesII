@@ -4,10 +4,6 @@ AI-powered coding assistant that can be integrated into various IDEs (like VS Co
 
 ## Engine
 
-### Configuration
-
-https://cheshire-cat-ai.github.io/docs/quickstart/installation-configuration/
-
 ### Run the engine
 
 ```bash
