@@ -1,18 +1,21 @@
 import WebSocket, { Server } from "ws";
 import logger from "../utils/Logger";
+import { GPTClient } from "../clients/GPTClient";
 
 export class SocketServer {
     private server: Server;
+    private gptClient: GPTClient;
 
     constructor(port: number) {
         this.server = new WebSocket.Server({ port });
         this.server.on("connection", this.handleConnection.bind(this));
+        this.gptClient = new GPTClient(process.env.OPENAI_API_KEY || "");
     }
 
     private handleConnection(ws: WebSocket): void {
         logger.debug("Client connected");
 
-        ws.on("message", (message: string) => {
+        ws.on("message", async (message: string) => {
             this.handleMessage(ws, message);
         });
 
@@ -26,9 +29,15 @@ export class SocketServer {
         });
     }
 
-    private handleMessage(ws: WebSocket, message: string): void {
+    private async handleMessage(ws: WebSocket, message: string): Promise<void> {
         logger.debug(`Received message: ${message}`);
-        ws.send("The output from the model: hello there!");
+        try {
+            const gptResponse = await this.gptClient.getResponse(message);
+            ws.send(gptResponse);
+        } catch (error) {
+            console.error("Error during GPT processing:", error);
+            ws.send("An error occurred while processing your request.");
+        }
     }
 
     private handleDisconnection(ws: WebSocket): void {

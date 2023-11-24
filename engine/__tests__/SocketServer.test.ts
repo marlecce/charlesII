@@ -2,6 +2,18 @@ import WebSocket from "ws";
 import { SocketServer } from "../src/server/SocketServer";
 import { delay } from "../src/utils/Helpers";
 
+const EXPECTED_GPT_OUTPUT = "Mocked GPT response";
+
+jest.mock("../src/clients/GPTClient", () => {
+    return {
+        GPTClient: jest.fn().mockImplementation(() => {
+            return {
+                getResponse: jest.fn().mockResolvedValue(EXPECTED_GPT_OUTPUT)
+            };
+        })
+    };
+});
+
 describe("SocketServer", () => {
     let server: SocketServer;
     const port = parseInt(process.env.SOCKET_SERVER_PORT || "");
@@ -44,7 +56,7 @@ describe("SocketServer", () => {
         });
 
         client.on("message", async (data) => {
-            expect(data.toString()).toBe("The output from the model: hello there!");
+            expect(data.toString()).toBe(EXPECTED_GPT_OUTPUT);
             client.close();
 
             await delay(500);
