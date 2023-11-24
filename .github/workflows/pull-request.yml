@@ -8,6 +8,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: "test"
+      HUGGING_FACE_API_KEY: "huggin_face_key"
+      OPENAI_API_KEY: "openai_key"
+      SOCKET_SERVER_PORT: 3001
 
     steps:
       - name: Checkout code
