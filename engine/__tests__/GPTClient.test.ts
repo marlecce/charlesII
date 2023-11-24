@@ -4,12 +4,14 @@ const FAKE_API = "fake-api-key";
 const EXPECTED_TEXT = "Hi There!";
 const fakeResponse = { choices: [{ text: EXPECTED_TEXT }] };
 
+const mockCreate = jest.fn().mockResolvedValue(fakeResponse);
+
 jest.mock("openai", () => {
     return {
         OpenAI: jest.fn().mockImplementation(() => {
             return {
                 completions: {
-                    create: jest.fn().mockResolvedValue(fakeResponse)
+                    create: mockCreate
                 }
             };
         })
@@ -19,13 +21,6 @@ jest.mock("openai", () => {
 import { GPTClient } from "../src/clients/GPTClient";
 
 describe("GPTClient", () => {
-    let client: GPTClient;
-
-    beforeEach(() => {
-        const apiKey = process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY : "";
-        client = new GPTClient(apiKey);
-    });
-
     it("should correctly retrieve a response from the API", async () => {
         const prompt = "Hello, world!";
 
@@ -33,6 +28,12 @@ describe("GPTClient", () => {
         const response = await client.getResponse(prompt);
 
         expect(response).toBe(EXPECTED_TEXT);
+
+        expect(mockCreate).toHaveBeenCalledWith({
+            model: "text-davinci-003",
+            prompt,
+            max_tokens: 150
+        });
     });
 
     it("should handle rate limit errors", async () => {
