@@ -36,7 +36,11 @@ export class SocketServer {
             ws.send(gptResponse);
         } catch (error) {
             console.error("Error during GPT processing:", error);
-            ws.send("An error occurred while processing your request.");
+            if (error instanceof Error) {
+                ws.send(`An error occurred while processing your request: ${error.message}`);
+            } else {
+                ws.send(`An error occurred while processing your request: ${error}`);
+            }
         }
     }
 

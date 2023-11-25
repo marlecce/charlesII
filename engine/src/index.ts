@@ -38,6 +38,10 @@ function run() {
         const config = new Config();
         socketServer = new SocketServer(config.socketServerPort);
         logger.info(`Application is running in "${config.nodeEnv}" on port ${config.socketServerPort}!`);
+
+        // Listing the termination signals
+        process.on("SIGINT", () => handleError(new Error("SIGINT received"), socketServer));
+        process.on("SIGTERM", () => handleError(new Error("SIGTERM received"), socketServer));
     } catch (error) {
         handleError(error, socketServer);
     }
