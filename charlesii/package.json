@@ -14,7 +14,7 @@
     "commands": [
       {
         "command": "extension.optimizeWithCharlesII",
-        "title": "Go CharlesII!"
+        "title": "Help me Charles II"
       }
     ],
     "menus": {
