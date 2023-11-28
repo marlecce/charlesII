@@ -1,206 +1,165 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import { exec } from "child_process";
 import * as path from "path";
 import WebSocket from "ws";
+import { getWebviewContent } from "./webview-content";
+import { startEngine, stopEngine } from "./engine-utils";
+
+const SOCKET_SERVER_URL = "ws://localhost:3006";
+const ENGINE_PATH = path.resolve(__dirname, "../../engine");
+
+let globalWebSocket: WebSocket | null = null;
+let currentPanel: vscode.WebviewPanel | undefined = undefined;
+let messageQueue: string[] = [];
 
 interface WebviewMessage {
   command: string;
   code?: string;
 }
 
-function startEngine(context: vscode.ExtensionContext) {
-  const enginePath = path.join(context.extensionPath, "../../engine");
-  const startCommand = "npm run start:prod";
-
-  exec(startCommand, { cwd: enginePath }, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Error during server engine setup: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`Error: ${stderr}`);
-      return;
-    }
-    console.log(`Server engine running: ${stdout}`);
-  });
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function stopEngine(context: vscode.ExtensionContext) {
-  const enginePath = path.join(context.extensionPath, "../engine");
-  const stopCommand = "npm stop";
+function setupClientWebSocket(context: vscode.ExtensionContext) {
+  globalWebSocket = new WebSocket(SOCKET_SERVER_URL);
+  globalWebSocket.on("open", () => {
+    console.log("WebSocket connection opened");
 
-  exec(stopCommand, { cwd: enginePath }, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Errore nell'arresto del server engine: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`Errore: ${stderr}`);
-      return;
-    }
-    console.log(`Server engine arrestato: ${stdout}`);
-  });
-}
-
-function getWebviewContent(initialCode: string) {
-  function escapeHtml(unsafe: string) {
-    return unsafe
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  return `
-        <html>
-        <head>
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/prism.min.js"></script>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/components/prism-javascript.min.js"></script>
-            <style>
-                /* Aggiungi ulteriori stili qui */
-                body {
-                    padding: 0;
-                    margin: 0;
-                }
-                .action-bar {
-                    position: sticky;
-                    top: 0;
-                    background-color: white;
-                    padding: 10px;
-                    text-align: center;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="action-bar">
-                <button onclick="sendAction('improveDesign')">Improve Design</button>
-                <button onclick="sendAction('optimizeCode')">Optimize Code</button>
-                <input type="text" id="codeInput" placeholder="Type your code here">
-                <button onclick="sendCode()">Send</button>
-            </div>
-            <pre><code id="codeBlock" class="language-javascript">${escapeHtml(
-              initialCode
-            )}</code></pre>
-
-            <script>
-                const vscode = acquireVsCodeApi();
-                
-                function sendAction(action) {
-                    vscode.postMessage({
-                        command: action
-                    });
-                }
-
-                function sendCode() {
-                    const code = document.getElementById('codeInput').value;
-                    vscode.postMessage({
-                        command: 'sendCode',
-                        code: code
-                    });
-                }
-
-                window.addEventListener('message', event => {
-                    const message = event.data;
-                    switch (message.command) {
-                        case 'updateCode':
-                            const codeBlock = document.getElementById('codeBlock');
-                            codeBlock.textContent = message.code;
-                            Prism.highlightElement(codeBlock);
-                            break;
-                    }
-                });
-            </script>
-        </body>
-        </html>
-    `;
-}
-
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
-  startEngine(context);
-
-  let disposable = vscode.commands.registerCommand(
-    "extension.optimizeWithCharlesII",
-    () => {
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        const codeToSend = editor.document.getText(editor.selection);
-
-        const ws = new WebSocket("ws://localhost:3006");
-        ws.on("open", function open() {
-          ws.send(codeToSend);
-        });
-
-        ws.on("message", function incoming(data: string) {
-          const responseCode = data.toString();
-
-          const panel = vscode.window.createWebviewPanel(
-            "codeActions",
-            "Code Actions",
-            vscode.ViewColumn.Beside,
-            {
-              enableScripts: true,
-            }
-          );
-
-          panel.webview.html = getWebviewContent(responseCode);
-
-          panel.webview.onDidReceiveMessage(
-            (message) => {
-              handleWebviewMessage(message, panel.webview);
-            },
-            undefined,
-            context.subscriptions
-          );
-        });
+    while (messageQueue.length > 0) {
+      const messageToSend = messageQueue.shift();
+      if (messageToSend) {
+        globalWebSocket?.send(messageToSend);
       }
     }
+  });
+  globalWebSocket.on("error", (error) =>
+    console.error(`WebSocket error: ${error.message}`)
+  );
+  globalWebSocket.on("close", () => {
+    console.log("WebSocket connection closed");
+    globalWebSocket = null;
+  });
+
+  globalWebSocket.on("message", (data: string) => {
+    const response = data.toString();
+    updateContent(response, context);
+  });
+}
+
+function updateContent(content: string, context: vscode.ExtensionContext) {
+  if (currentPanel) {
+    currentPanel.webview.postMessage({
+      command: "updateCode",
+      code: content,
+    });
+  } else {
+    currentPanel = createWebView(context);
+    currentPanel.webview.html = getWebviewContent(content);
+  }
+}
+
+function createWebView(context: vscode.ExtensionContext): vscode.WebviewPanel {
+  let webviewPanel = vscode.window.createWebviewPanel(
+    "codeActions",
+    "Code Actions",
+    vscode.ViewColumn.Beside,
+    { enableScripts: true }
   );
 
-  context.subscriptions.push(disposable);
+  webviewPanel.webview.html = getWebviewContent("Loading...");
+
+  webviewPanel.onDidDispose(
+    () => {
+      currentPanel = undefined;
+    },
+    null,
+    context.subscriptions
+  );
+
+  //  currentPanel.webview.onDidReceiveMessage(
+  //    (message) => {
+  //      handleWebviewMessage(message, currentPanel.webview);
+  //    },
+  //    undefined,
+  //    context.subscriptions
+  //  );
+
+  return webviewPanel;
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  startEngine(ENGINE_PATH);
+  await sleep(3000);
+  try {
+    console.log("Engine is now ready to use.");
+
+    setupClientWebSocket(context);
+
+    let disposable = vscode.commands.registerCommand(
+      "extension.optimizeWithCharlesII",
+      () => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          const codeToSend = editor.document.getText(editor.selection);
+
+          if (!currentPanel) {
+            currentPanel = createWebView(context);
+          }
+
+          sendCodeToWebSocket(codeToSend);
+        }
+      }
+    );
+
+    context.subscriptions.push(disposable);
+  } catch (error) {
+    vscode.window.showErrorMessage(`Engine could not be started: ${error}`);
+    return;
+  }
 }
 
 function handleWebviewMessage(
   message: WebviewMessage,
   webview: vscode.Webview
 ) {
-  switch (message.command) {
-    case "improveDesign":
-      // Logica per "Improve Design"
-      break;
-    case "optimizeCode":
-      // Logica per "Optimize Code"
-      break;
-    case "sendCode":
-      // Invia codice al WebSocket e gestisci la risposta
-      sendCodeToWebSocket(message.code, webview);
-      break;
+  // Gestisce i messaggi ricevuti dalla webview
+  // ...
+}
+
+async function sendCodeToWebSocket(code: string | undefined) {
+  if (!code) {
+    console.error("Attempted to send undefined code");
+    return;
   }
+
+  await waitForWebSocketToConnect(globalWebSocket);
+
+  globalWebSocket?.send(code);
 }
 
-function sendCodeToWebSocket(
-  code: string | undefined,
-  webview: vscode.Webview
-) {
-  const ws = new WebSocket("ws://localhost:3006");
-  ws.on("open", function open() {
-    if (code) {
-      ws.send(code);
-    } else {
-      console.error("Attempted to send undefined code");
-    }
-  });
+function waitForWebSocketToConnect(webSocket: WebSocket | null): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const maxWaitTime = 5000;
+    const checkInterval = 100;
 
-  ws.on("message", function incoming(data: string) {
-    webview.postMessage({ command: "updateCode", code: data.toString() });
+    let waitedTime = 0;
+    const interval = setInterval(() => {
+      if (webSocket && webSocket.readyState === WebSocket.OPEN) {
+        clearInterval(interval);
+        resolve();
+      } else if (waitedTime >= maxWaitTime) {
+        clearInterval(interval);
+        reject(new Error("WebSocket connection timeout"));
+      } else {
+        waitedTime += checkInterval;
+      }
+    }, checkInterval);
   });
 }
-// This method is called when your extension is deactivated
+
 export function deactivate(context: vscode.ExtensionContext) {
-  stopEngine(context);
+  stopEngine(ENGINE_PATH);
+  if (globalWebSocket) {
+    globalWebSocket.close();
+  }
 }
