@@ -4,6 +4,8 @@ import { getWebviewContent } from "./webview-content";
 import { startEngine, stopEngine } from "./engine-utils";
 
 const SOCKET_SERVER_URL = "ws://localhost:3006";
+const MAX_RETRY_ATTEMPTS = 10;
+const RETRY_INTERVAL = 300;
 
 let clientSocket: WebSocket | null = null;
 let currentPanel: vscode.WebviewPanel | undefined = undefined;
@@ -17,30 +19,62 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function setupClientWebSocket(context: vscode.ExtensionContext): WebSocket {
-  if (!clientSocket) {
-    clientSocket = new WebSocket(SOCKET_SERVER_URL);
+function setupClientWebSocket(
+  context: vscode.ExtensionContext
+): Promise<WebSocket> {
+  return new Promise((resolve, reject) => {
+    if (clientSocket) {
+      resolve(clientSocket);
+      return;
+    }
 
-    clientSocket.on("open", () => {
-      console.log("WebSocket connection opened");
-    });
+    let retryAttempts = 0;
+    let connecting = false;
 
-    clientSocket.on("error", (error) =>
-      console.error(`WebSocket error: ${error.message}`)
-    );
+    function tryConnect() {
+      if (retryAttempts >= MAX_RETRY_ATTEMPTS) {
+        reject(
+          new Error("WebSocket connection failed after multiple attempts.")
+        );
+        return;
+      }
 
-    clientSocket.on("close", () => {
-      console.log("WebSocket connection closed");
-      clientSocket = null;
-    });
+      if (connecting) {
+        return;
+      }
 
-    clientSocket.on("message", (data: string) => {
-      const response = data.toString();
-      updateContent(response, context);
-    });
-  }
+      connecting = true;
+      clientSocket = new WebSocket(SOCKET_SERVER_URL);
 
-  return clientSocket;
+      clientSocket.on("open", () => {
+        console.log("WebSocket connection opened");
+        connecting = false;
+        resolve(clientSocket!);
+      });
+
+      clientSocket.on("error", (error) => {
+        console.error(`WebSocket error: ${error.message}`);
+        connecting = false;
+        retryAttempts++;
+        setTimeout(tryConnect, RETRY_INTERVAL);
+      });
+
+      clientSocket.on("close", () => {
+        console.log("WebSocket connection closed");
+        clientSocket = null;
+        connecting = false;
+        retryAttempts++;
+        setTimeout(tryConnect, RETRY_INTERVAL);
+      });
+
+      clientSocket.on("message", (data: string) => {
+        const response = data.toString();
+        updateContent(response, context);
+      });
+    }
+
+    tryConnect();
+  });
 }
 
 function updateContent(content: string, context: vscode.ExtensionContext) {
@@ -88,7 +122,7 @@ function handleWebviewMessage(
   message: WebviewMessage,
   webview: vscode.Webview
 ) {
-  // Gestisce i messaggi ricevuti dalla webview
+  // handle the massages from the webview
   // ...
 }
 
@@ -116,8 +150,7 @@ export function activate(context: vscode.ExtensionContext) {
               console.log(result);
               await sleep(300);
 
-              const clientSocket = setupClientWebSocket(context);
-              await sleep(300);
+              const clientSocket = await setupClientWebSocket(context);
 
               sendCodeToEngine(clientSocket, codeToSend);
             })
