@@ -1,15 +1,12 @@
 import * as vscode from "vscode";
-import * as path from "path";
 import WebSocket from "ws";
 import { getWebviewContent } from "./webview-content";
 import { startEngine, stopEngine } from "./engine-utils";
 
 const SOCKET_SERVER_URL = "ws://localhost:3006";
-const ENGINE_PATH = path.resolve(__dirname, "../../engine");
 
-let globalWebSocket: WebSocket | null = null;
+let clientSocket: WebSocket | null = null;
 let currentPanel: vscode.WebviewPanel | undefined = undefined;
-let messageQueue: string[] = [];
 
 interface WebviewMessage {
   command: string;
@@ -20,30 +17,30 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function setupClientWebSocket(context: vscode.ExtensionContext) {
-  globalWebSocket = new WebSocket(SOCKET_SERVER_URL);
-  globalWebSocket.on("open", () => {
-    console.log("WebSocket connection opened");
+function setupClientWebSocket(context: vscode.ExtensionContext): WebSocket {
+  if (!clientSocket) {
+    clientSocket = new WebSocket(SOCKET_SERVER_URL);
 
-    while (messageQueue.length > 0) {
-      const messageToSend = messageQueue.shift();
-      if (messageToSend) {
-        globalWebSocket?.send(messageToSend);
-      }
-    }
-  });
-  globalWebSocket.on("error", (error) =>
-    console.error(`WebSocket error: ${error.message}`)
-  );
-  globalWebSocket.on("close", () => {
-    console.log("WebSocket connection closed");
-    globalWebSocket = null;
-  });
+    clientSocket.on("open", () => {
+      console.log("WebSocket connection opened");
+    });
 
-  globalWebSocket.on("message", (data: string) => {
-    const response = data.toString();
-    updateContent(response, context);
-  });
+    clientSocket.on("error", (error) =>
+      console.error(`WebSocket error: ${error.message}`)
+    );
+
+    clientSocket.on("close", () => {
+      console.log("WebSocket connection closed");
+      clientSocket = null;
+    });
+
+    clientSocket.on("message", (data: string) => {
+      const response = data.toString();
+      updateContent(response, context);
+    });
+  }
+
+  return clientSocket;
 }
 
 function updateContent(content: string, context: vscode.ExtensionContext) {
@@ -87,26 +84,47 @@ function createWebView(context: vscode.ExtensionContext): vscode.WebviewPanel {
   return webviewPanel;
 }
 
-export async function activate(context: vscode.ExtensionContext) {
-  startEngine(ENGINE_PATH);
-  await sleep(3000);
+function handleWebviewMessage(
+  message: WebviewMessage,
+  webview: vscode.Webview
+) {
+  // Gestisce i messaggi ricevuti dalla webview
+  // ...
+}
+
+function sendCodeToEngine(clientSocket: WebSocket, code: string | undefined) {
+  if (!code) {
+    console.error("Attempted to send undefined code");
+    return;
+  }
+
+  clientSocket.send(code);
+}
+
+export function activate(context: vscode.ExtensionContext) {
   try {
-    console.log("Engine is now ready to use.");
-
-    setupClientWebSocket(context);
-
     let disposable = vscode.commands.registerCommand(
       "extension.optimizeWithCharlesII",
       () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
           const codeToSend = editor.document.getText(editor.selection);
+          console.log("Code to send:", codeToSend);
 
-          if (!currentPanel) {
-            currentPanel = createWebView(context);
-          }
+          startEngine()
+            .then(async (result) => {
+              console.log(result);
+              await sleep(300);
 
-          sendCodeToWebSocket(codeToSend);
+              const clientSocket = setupClientWebSocket(context);
+              await sleep(300);
+
+              sendCodeToEngine(clientSocket, codeToSend);
+            })
+            .catch((error) => {
+              console.error(error);
+              throw error;
+            });
         }
       }
     );
@@ -118,48 +136,9 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 }
 
-function handleWebviewMessage(
-  message: WebviewMessage,
-  webview: vscode.Webview
-) {
-  // Gestisce i messaggi ricevuti dalla webview
-  // ...
-}
-
-async function sendCodeToWebSocket(code: string | undefined) {
-  if (!code) {
-    console.error("Attempted to send undefined code");
-    return;
-  }
-
-  await waitForWebSocketToConnect(globalWebSocket);
-
-  globalWebSocket?.send(code);
-}
-
-function waitForWebSocketToConnect(webSocket: WebSocket | null): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const maxWaitTime = 5000;
-    const checkInterval = 100;
-
-    let waitedTime = 0;
-    const interval = setInterval(() => {
-      if (webSocket && webSocket.readyState === WebSocket.OPEN) {
-        clearInterval(interval);
-        resolve();
-      } else if (waitedTime >= maxWaitTime) {
-        clearInterval(interval);
-        reject(new Error("WebSocket connection timeout"));
-      } else {
-        waitedTime += checkInterval;
-      }
-    }, checkInterval);
-  });
-}
-
-export function deactivate(context: vscode.ExtensionContext) {
-  stopEngine(ENGINE_PATH);
-  if (globalWebSocket) {
-    globalWebSocket.close();
+export function deactivate(clientSocket: WebSocket) {
+  stopEngine();
+  if (clientSocket) {
+    clientSocket.close();
   }
 }
