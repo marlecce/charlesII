@@ -15,10 +15,6 @@ interface WebviewMessage {
   code?: string;
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function setupClientWebSocket(
   context: vscode.ExtensionContext
 ): Promise<WebSocket> {
@@ -148,7 +144,6 @@ export function activate(context: vscode.ExtensionContext) {
           startEngine()
             .then(async (result) => {
               console.log(result);
-              await sleep(300);
 
               const clientSocket = await setupClientWebSocket(context);
 
