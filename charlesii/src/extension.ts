@@ -19,66 +19,70 @@ function setupClientWebSocket(
   context: vscode.ExtensionContext
 ): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    if (clientSocket) {
-      resolve(clientSocket);
-      return;
-    }
-
-    let retryAttempts = 0;
-    let connecting = false;
-
-    function tryConnect() {
-      if (retryAttempts >= MAX_RETRY_ATTEMPTS) {
-        reject(
-          new Error("WebSocket connection failed after multiple attempts.")
-        );
+    try {
+      if (clientSocket) {
+        resolve(clientSocket);
         return;
       }
 
-      if (connecting) {
-        return;
-      }
+      let retryAttempts = 0;
+      let connecting = false;
 
-      connecting = true;
-
-      vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Connecting to the Engine...",
-        },
-        async () => {
-          clientSocket = new WebSocket(SOCKET_SERVER_URL);
-
-          clientSocket.on("open", () => {
-            console.log("WebSocket connection opened");
-            connecting = false;
-            resolve(clientSocket!);
-          });
-
-          clientSocket.on("error", (error) => {
-            console.error(`WebSocket error: ${error.message}`);
-            connecting = false;
-            retryAttempts++;
-            setTimeout(tryConnect, RETRY_INTERVAL);
-          });
-
-          clientSocket.on("close", () => {
-            console.log("WebSocket connection closed");
-            clientSocket = null;
-            connecting = false;
-            retryAttempts++;
-            setTimeout(tryConnect, RETRY_INTERVAL);
-          });
-
-          clientSocket.on("message", (data: string) => {
-            const response = data.toString();
-            updateContent(response, context);
-          });
+      function tryConnect() {
+        if (retryAttempts >= MAX_RETRY_ATTEMPTS) {
+          reject(
+            new Error("WebSocket connection failed after multiple attempts.")
+          );
+          return;
         }
-      );
-    }
 
-    tryConnect();
+        if (connecting) {
+          return;
+        }
+
+        connecting = true;
+
+        vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "Connecting to the Engine...",
+          },
+          async () => {
+            clientSocket = new WebSocket(SOCKET_SERVER_URL);
+
+            clientSocket.on("open", () => {
+              console.log("WebSocket connection opened");
+              connecting = false;
+              resolve(clientSocket!);
+            });
+
+            clientSocket.on("error", (error) => {
+              console.error(`WebSocket error: ${error.message}`);
+              connecting = false;
+              retryAttempts++;
+              setTimeout(tryConnect, RETRY_INTERVAL);
+            });
+
+            clientSocket.on("close", () => {
+              console.log("WebSocket connection closed");
+              clientSocket = null;
+              connecting = false;
+              retryAttempts++;
+              setTimeout(tryConnect, RETRY_INTERVAL);
+            });
+
+            clientSocket.on("message", (data: string) => {
+              const response = data.toString();
+              updateContent(response, context);
+            });
+          }
+        );
+      }
+
+      tryConnect();
+    } catch (error) {
+      reject(error);
+    }
   });
 }
 
@@ -141,41 +145,38 @@ function sendCodeToEngine(clientSocket: WebSocket, code: string | undefined) {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  try {
-    let disposable = vscode.commands.registerCommand(
-      "extension.optimizeWithCharlesII",
-      () => {
-        const editor = vscode.window.activeTextEditor;
-        if (editor) {
-          const codeToSend = editor.document.getText(editor.selection);
-          console.log("Code to send:", codeToSend);
+  let disposable = vscode.commands.registerCommand(
+    "extension.optimizeWithCharlesII",
+    () => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        const codeToSend = editor.document.getText(editor.selection);
+        console.log("Code to send:", codeToSend);
 
-          startEngine()
-            .then(async (result) => {
-              console.log(result);
+        startEngine()
+          .then(async (result) => {
+            console.log(result);
 
-              const clientSocket = await setupClientWebSocket(context);
+            const clientSocket = await setupClientWebSocket(context);
 
-              sendCodeToEngine(clientSocket, codeToSend);
-            })
-            .catch((error) => {
-              console.error(error);
-              throw error;
-            });
-        }
+            sendCodeToEngine(clientSocket, codeToSend);
+          })
+          .catch((error) => {
+            vscode.window.showErrorMessage(
+              `Engine could not be started: ${error}`
+            );
+            return;
+          });
       }
-    );
+    }
+  );
 
-    context.subscriptions.push(disposable);
-  } catch (error) {
-    vscode.window.showErrorMessage(`Engine could not be started: ${error}`);
-    return;
-  }
+  context.subscriptions.push(disposable);
 }
 
 export function deactivate(clientSocket: WebSocket) {
   stopEngine();
-  if (clientSocket) {
+  if (clientSocket?.readyState === WebSocket.OPEN) {
     clientSocket.close();
   }
 }
