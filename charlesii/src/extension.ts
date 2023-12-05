@@ -26,7 +26,6 @@ function setupClientWebSocket(
       }
 
       let retryAttempts = 0;
-      let connecting = false;
 
       function tryConnect() {
         if (retryAttempts >= MAX_RETRY_ATTEMPTS) {
@@ -36,23 +35,19 @@ function setupClientWebSocket(
           return;
         }
 
-        if (connecting) {
+        if (clientSocket && clientSocket.readyState === WebSocket.CONNECTING) {
           return;
         }
-
-        connecting = true;
 
         clientSocket = new WebSocket(SOCKET_SERVER_URL);
 
         clientSocket.on("open", () => {
           console.log("WebSocket connection opened");
-          connecting = false;
           resolve(clientSocket!);
         });
 
         clientSocket.on("error", (error) => {
           console.error(`WebSocket error: ${error.message}`);
-          connecting = false;
           retryAttempts++;
           setTimeout(tryConnect, RETRY_INTERVAL);
         });
@@ -60,7 +55,6 @@ function setupClientWebSocket(
         clientSocket.on("close", () => {
           console.log("WebSocket connection closed");
           clientSocket = null;
-          connecting = false;
           retryAttempts++;
           setTimeout(tryConnect, RETRY_INTERVAL);
         });
