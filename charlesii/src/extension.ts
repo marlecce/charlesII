@@ -42,44 +42,44 @@ function setupClientWebSocket(
 
         connecting = true;
 
-        vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: "Connecting to the Engine...",
-          },
-          async () => {
-            clientSocket = new WebSocket(SOCKET_SERVER_URL);
+        clientSocket = new WebSocket(SOCKET_SERVER_URL);
 
-            clientSocket.on("open", () => {
-              console.log("WebSocket connection opened");
-              connecting = false;
-              resolve(clientSocket!);
-            });
+        clientSocket.on("open", () => {
+          console.log("WebSocket connection opened");
+          connecting = false;
+          resolve(clientSocket!);
+        });
 
-            clientSocket.on("error", (error) => {
-              console.error(`WebSocket error: ${error.message}`);
-              connecting = false;
-              retryAttempts++;
-              setTimeout(tryConnect, RETRY_INTERVAL);
-            });
+        clientSocket.on("error", (error) => {
+          console.error(`WebSocket error: ${error.message}`);
+          connecting = false;
+          retryAttempts++;
+          setTimeout(tryConnect, RETRY_INTERVAL);
+        });
 
-            clientSocket.on("close", () => {
-              console.log("WebSocket connection closed");
-              clientSocket = null;
-              connecting = false;
-              retryAttempts++;
-              setTimeout(tryConnect, RETRY_INTERVAL);
-            });
+        clientSocket.on("close", () => {
+          console.log("WebSocket connection closed");
+          clientSocket = null;
+          connecting = false;
+          retryAttempts++;
+          setTimeout(tryConnect, RETRY_INTERVAL);
+        });
 
-            clientSocket.on("message", (data: string) => {
-              const response = data.toString();
-              updateContent(response, context);
-            });
-          }
-        );
+        clientSocket.on("message", (data: string) => {
+          const response = data.toString();
+          updateContent(response, context);
+        });
       }
 
-      tryConnect();
+      vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Connecting to the Engine...",
+        },
+        async () => {
+          tryConnect();
+        }
+      );
     } catch (error) {
       reject(error);
     }
