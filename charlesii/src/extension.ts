@@ -95,7 +95,7 @@ function updateContent(content: string, context: vscode.ExtensionContext) {
 function createWebView(context: vscode.ExtensionContext): vscode.WebviewPanel {
   let webviewPanel = vscode.window.createWebviewPanel(
     "codeActions",
-    "Code Actions",
+    "CharlesII",
     vscode.ViewColumn.Beside,
     { enableScripts: true }
   );
@@ -110,13 +110,13 @@ function createWebView(context: vscode.ExtensionContext): vscode.WebviewPanel {
     context.subscriptions
   );
 
-  //  currentPanel.webview.onDidReceiveMessage(
-  //    (message) => {
-  //      handleWebviewMessage(message, currentPanel.webview);
-  //    },
-  //    undefined,
-  //    context.subscriptions
-  //  );
+  webviewPanel.webview.onDidReceiveMessage(
+    (message) => {
+      handleWebviewMessage(message, webviewPanel.webview);
+    },
+    undefined,
+    context.subscriptions
+  );
 
   return webviewPanel;
 }
@@ -125,8 +125,19 @@ function handleWebviewMessage(
   message: WebviewMessage,
   webview: vscode.Webview
 ) {
-  // handle the massages from the webview
-  // ...
+  switch (message.command) {
+    case "improveDesign":
+      vscode.window.showInformationMessage("Improving design...");
+      break;
+
+    case "optimizeCode":
+      vscode.window.showInformationMessage("Optimizing code...");
+      break;
+
+    default:
+      vscode.window.showWarningMessage("Unknown action");
+      break;
+  }
 }
 
 function sendCodeToEngine(clientSocket: WebSocket, code: string | undefined) {
