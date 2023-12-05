@@ -5,7 +5,7 @@ import { startEngine, stopEngine } from "./engine-utils";
 
 const SOCKET_SERVER_URL = "ws://localhost:3006";
 const MAX_RETRY_ATTEMPTS = 10;
-const RETRY_INTERVAL = 300;
+const RETRY_INTERVAL = 50;
 
 let clientSocket: WebSocket | null = null;
 let currentPanel: vscode.WebviewPanel | undefined = undefined;
@@ -40,33 +40,42 @@ function setupClientWebSocket(
       }
 
       connecting = true;
-      clientSocket = new WebSocket(SOCKET_SERVER_URL);
 
-      clientSocket.on("open", () => {
-        console.log("WebSocket connection opened");
-        connecting = false;
-        resolve(clientSocket!);
-      });
+      vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Connecting to the Engine...",
+        },
+        async () => {
+          clientSocket = new WebSocket(SOCKET_SERVER_URL);
 
-      clientSocket.on("error", (error) => {
-        console.error(`WebSocket error: ${error.message}`);
-        connecting = false;
-        retryAttempts++;
-        setTimeout(tryConnect, RETRY_INTERVAL);
-      });
+          clientSocket.on("open", () => {
+            console.log("WebSocket connection opened");
+            connecting = false;
+            resolve(clientSocket!);
+          });
 
-      clientSocket.on("close", () => {
-        console.log("WebSocket connection closed");
-        clientSocket = null;
-        connecting = false;
-        retryAttempts++;
-        setTimeout(tryConnect, RETRY_INTERVAL);
-      });
+          clientSocket.on("error", (error) => {
+            console.error(`WebSocket error: ${error.message}`);
+            connecting = false;
+            retryAttempts++;
+            setTimeout(tryConnect, RETRY_INTERVAL);
+          });
 
-      clientSocket.on("message", (data: string) => {
-        const response = data.toString();
-        updateContent(response, context);
-      });
+          clientSocket.on("close", () => {
+            console.log("WebSocket connection closed");
+            clientSocket = null;
+            connecting = false;
+            retryAttempts++;
+            setTimeout(tryConnect, RETRY_INTERVAL);
+          });
+
+          clientSocket.on("message", (data: string) => {
+            const response = data.toString();
+            updateContent(response, context);
+          });
+        }
+      );
     }
 
     tryConnect();
