@@ -174,7 +174,6 @@ export function activate(context: vscode.ExtensionContext) {
       const editor = vscode.window.activeTextEditor;
       if (editor) {
         const codeToSend = editor.document.getText(editor.selection);
-        console.log("Code to send:", codeToSend);
 
         startEngine()
           .then(async (result) => {
