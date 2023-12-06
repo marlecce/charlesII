@@ -21,6 +21,7 @@ function setupClientWebSocket(
   return new Promise((resolve, reject) => {
     try {
       if (clientSocket) {
+        console.log("Client already started");
         resolve(clientSocket);
         return;
       }
@@ -112,7 +113,7 @@ function createWebView(context: vscode.ExtensionContext): vscode.WebviewPanel {
 
   webviewPanel.webview.onDidReceiveMessage(
     (message) => {
-      handleWebviewMessage(message, webviewPanel.webview);
+      handleWebviewMessage(message, webviewPanel.webview, context);
     },
     undefined,
     context.subscriptions
@@ -121,18 +122,12 @@ function createWebView(context: vscode.ExtensionContext): vscode.WebviewPanel {
   return webviewPanel;
 }
 
-function handleWebviewMessage(
-  message: WebviewMessage,
-  webview: vscode.Webview
-) {
-  switch (message.command) {
+function getRicherPrompt(command: string) {
+  switch (command) {
     case "improveDesign":
-      vscode.window.showInformationMessage("Improving design...");
-      break;
-
+      return "Acting as a senior developer, can you improve the design of the following code";
     case "optimizeCode":
-      vscode.window.showInformationMessage("Optimizing code...");
-      break;
+      return "Acting as a senior developer, can you optimize the following code";
 
     default:
       vscode.window.showWarningMessage("Unknown action");
@@ -140,7 +135,40 @@ function handleWebviewMessage(
   }
 }
 
-function sendCodeToEngine(clientSocket: WebSocket, code: string | undefined) {
+function handleWebviewMessage(
+  message: WebviewMessage,
+  webview: vscode.Webview,
+  context: vscode.ExtensionContext
+) {
+  try {
+    let richerPrompt = getRicherPrompt(message.command);
+
+    setupClientWebSocket(context)
+      .then((clientSocket) => {
+        richerPrompt = `${richerPrompt}: ${message.code}`;
+
+        sendPromptToEngine(clientSocket, richerPrompt);
+
+        clientSocket.on("message", (data: string) => {
+          const response = data.toString();
+
+          webview.postMessage({
+            command: "updateCode",
+            code: response,
+          });
+        });
+      })
+      .catch((error) => {
+        vscode.window.showErrorMessage(
+          `Client could not be available: ${error}`
+        );
+      });
+  } catch (error) {
+    vscode.window.showWarningMessage(`Unable to update the output: ${error}`);
+  }
+}
+
+function sendPromptToEngine(clientSocket: WebSocket, code: string | undefined) {
   if (!code) {
     console.error("Attempted to send undefined code");
     return;
@@ -164,7 +192,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             const clientSocket = await setupClientWebSocket(context);
 
-            sendCodeToEngine(clientSocket, codeToSend);
+            sendPromptToEngine(clientSocket, codeToSend);
           })
           .catch((error) => {
             vscode.window.showErrorMessage(
