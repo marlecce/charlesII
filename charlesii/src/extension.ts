@@ -146,17 +146,7 @@ function handleWebviewMessage(
     setupClientWebSocket(context)
       .then((clientSocket) => {
         richerPrompt = `${richerPrompt}: ${message.code}`;
-
         sendPromptToEngine(clientSocket, richerPrompt);
-
-        clientSocket.on("message", (data: string) => {
-          const response = data.toString();
-
-          webview.postMessage({
-            command: "updateCode",
-            code: response,
-          });
-        });
       })
       .catch((error) => {
         vscode.window.showErrorMessage(
