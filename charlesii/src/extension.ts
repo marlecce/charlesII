@@ -15,6 +15,15 @@ interface WebviewMessage {
   code?: string;
 }
 
+function updateProgressIndicator(message: string) {
+  if (currentPanel) {
+    currentPanel.webview.postMessage({
+      command: "updateProgressIndicator",
+      message,
+    });
+  }
+}
+
 function setupClientWebSocket(
   context: vscode.ExtensionContext
 ): Promise<WebSocket> {
@@ -143,6 +152,8 @@ function handleWebviewMessage(
   try {
     let richerPrompt = getRicherPrompt(message.command);
 
+    updateProgressIndicator("Analyzing code...");
+
     setupClientWebSocket(context)
       .then((clientSocket) => {
         richerPrompt = `${richerPrompt}: ${message.code}`;
@@ -179,6 +190,7 @@ export function activate(context: vscode.ExtensionContext) {
           .then(async (result) => {
             console.log(result);
 
+            updateProgressIndicator("Analyzing code...");
             const clientSocket = await setupClientWebSocket(context);
 
             sendPromptToEngine(clientSocket, codeToSend);
