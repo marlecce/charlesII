@@ -3,7 +3,9 @@ import WebSocket from "ws";
 import { getWebviewContent } from "./webview-content";
 import { startEngine, stopEngine } from "./engine-utils";
 
-const SOCKET_SERVER_URL = "ws://localhost:3006";
+const PORT =
+  !process.env.NODE_ENV || process.env.NODE_ENV !== "production" ? 3005 : 3006;
+const SOCKET_SERVER_URL = `ws://localhost:${PORT}`;
 const MAX_RETRY_ATTEMPTS = 10;
 const RETRY_INTERVAL = 50;
 

@@ -4,17 +4,26 @@ import * as path from "path";
 let serverStarted = false;
 
 function getEnginePath(): string {
-  return path.resolve(__dirname, "../../engine");
+  console.log("process.env.NODE_ENV: " + process.env.NODE_ENV);
+  if (!process.env.NODE_ENV || process.env.NODE_ENV !== "production") {
+    return path.resolve(__dirname, "../../engine");
+  }
+
+  return require.resolve("@charlesII/engine");
 }
 
 export function startEngine() {
+  let args = ["run", "dev"];
+  if (process.env.NODE_ENV && process.env.NODE_ENV === "production") {
+    args = ["start"];
+  }
+
   return new Promise<string>((resolve, reject) => {
     if (serverStarted) {
       resolve("The Engine is already running...");
     }
 
     const command = "npm";
-    const args = ["start"];
     const options = {
       cwd: getEnginePath(),
       detached: true,

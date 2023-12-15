@@ -2,6 +2,10 @@
     "name": "engine",
     "version": "1.0.0",
     "description": "",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/marlecce/charlesII.git"
+    },
     "main": "src/index.ts",
     "scripts": {
         "start:pm2": "NODE_ENV=production pm2 start dist/index.js --name 'engine-server'",

@@ -3,6 +3,10 @@
   "displayName": "CharlesII",
   "description": "AI-powered coding assistant that provide real-time coding support, insights, and interactions using a LLM ChatGPT-like model.",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marlecce/charlesII.git"
+  },
   "engines": {
     "vscode": "^1.84.0"
   },
