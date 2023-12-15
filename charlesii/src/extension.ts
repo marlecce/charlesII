@@ -4,9 +4,9 @@ import { getWebviewContent } from "./webview-content";
 import { startEngine, stopEngine } from "./engine-utils";
 
 const PORT =
-  !process.env.NODE_ENV || process.env.NODE_ENV !== "production" ? 3005 : 3006;
+  !process.env.NODE_ENV || process.env.NODE_ENV !== "production" ? 3008 : 3009;
 const SOCKET_SERVER_URL = `ws://localhost:${PORT}`;
-const MAX_RETRY_ATTEMPTS = 10;
+const MAX_RETRY_ATTEMPTS = 20;
 const RETRY_INTERVAL = 50;
 
 let clientSocket: WebSocket | null = null;

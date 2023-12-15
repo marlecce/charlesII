@@ -39,7 +39,10 @@ export function startEngine() {
     process.stdout?.on("data", (data) => {
       const output: string = data.toString("utf-8");
 
-      if (output.includes("Process successfully started")) {
+      if (
+        output.includes('Application is running in "development"') ||
+        output.includes("Process successfully started")
+      ) {
         serverStarted = true;
         resolve("Engine server started");
       }
