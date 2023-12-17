@@ -9,13 +9,23 @@ function getEnginePath(): string {
     return path.resolve(__dirname, "../../engine");
   }
 
-  return require.resolve("@charlesII/engine");
+  return path.resolve(__dirname, "../");
 }
 
 export function startEngine() {
   let args = ["run", "dev"];
+  let command = "npm";
+
   if (process.env.NODE_ENV && process.env.NODE_ENV === "production") {
-    args = ["start"];
+    args = [
+      "start",
+      "--env",
+      "production",
+      `${__dirname}/../node_modules/@charlesII/engine/index.js`,
+      "--name",
+      "engine-server",
+    ];
+    command = `${__dirname}/../node_modules/.bin/pm2`;
   }
 
   return new Promise<string>((resolve, reject) => {
@@ -23,16 +33,17 @@ export function startEngine() {
       resolve("The Engine is already running...");
     }
 
-    const command = "npm";
     const options = {
       cwd: getEnginePath(),
       detached: true,
       stdio: ["ignore", "pipe", "pipe"] as StdioOptions,
+      shell: true,
     };
 
     const process: ChildProcess = spawn(command, args, options);
 
     process.on("error", (err) => {
+      console.error(JSON.stringify(err));
       reject(`Error starting the engine server: ${err}`);
     });
 
