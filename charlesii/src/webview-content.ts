@@ -113,7 +113,8 @@ export function getWebviewContent(code: string) {
 
         function sendAction(action) {
           vscode.postMessage({
-            command: action
+            command: action,
+            code: "${escapedCode}"
           });
         }
 

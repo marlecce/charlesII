@@ -1,15 +1,10 @@
 import * as vscode from "vscode";
 import WebSocket from "ws";
 import { getWebviewContent } from "./webview-content";
-import { startEngine, stopEngine } from "./engine-utils";
+// import { startEngine, stopEngine } from "./engine-utils";
+import { GPTClient } from "./GPTClient";
 
-const PORT =
-  !process.env.NODE_ENV || process.env.NODE_ENV !== "production" ? 3008 : 3009;
-const SOCKET_SERVER_URL = `ws://localhost:${PORT}`;
-const MAX_RETRY_ATTEMPTS = 20;
-const RETRY_INTERVAL = 50;
-
-let clientSocket: WebSocket | null = null;
+let gptClient: GPTClient | null = null;
 let currentPanel: vscode.WebviewPanel | undefined = undefined;
 
 interface WebviewMessage {
@@ -24,72 +19,6 @@ function updateProgressIndicator(message: string) {
       message,
     });
   }
-}
-
-function setupClientWebSocket(
-  context: vscode.ExtensionContext
-): Promise<WebSocket> {
-  return new Promise((resolve, reject) => {
-    try {
-      if (clientSocket) {
-        console.log("Client already started");
-        resolve(clientSocket);
-        return;
-      }
-
-      let retryAttempts = 0;
-
-      function tryConnect() {
-        if (retryAttempts >= MAX_RETRY_ATTEMPTS) {
-          reject(
-            new Error("WebSocket connection failed after multiple attempts.")
-          );
-          return;
-        }
-
-        if (clientSocket && clientSocket.readyState === WebSocket.CONNECTING) {
-          return;
-        }
-
-        clientSocket = new WebSocket(SOCKET_SERVER_URL);
-
-        clientSocket.on("open", () => {
-          console.log("WebSocket connection opened");
-          resolve(clientSocket!);
-        });
-
-        clientSocket.on("error", (error) => {
-          console.error(`WebSocket error: ${error.message}`);
-          retryAttempts++;
-          setTimeout(tryConnect, RETRY_INTERVAL);
-        });
-
-        clientSocket.on("close", () => {
-          console.log("WebSocket connection closed");
-          clientSocket = null;
-          retryAttempts++;
-          setTimeout(tryConnect, RETRY_INTERVAL);
-        });
-
-        clientSocket.on("message", (data: string) => {
-          const response = data.toString();
-          updateContent(response, context);
-        });
-      }
-
-      vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Connecting to the Engine...",
-        },
-        async () => {
-          tryConnect();
-        }
-      );
-    } catch (error) {
-      reject(error);
-    }
-  });
 }
 
 function updateContent(content: string, context: vscode.ExtensionContext) {
@@ -124,7 +53,7 @@ function createWebView(context: vscode.ExtensionContext): vscode.WebviewPanel {
 
   webviewPanel.webview.onDidReceiveMessage(
     (message) => {
-      handleWebviewMessage(message, webviewPanel.webview, context);
+      handleWebviewMessage(message, context);
     },
     undefined,
     context.subscriptions
@@ -133,51 +62,46 @@ function createWebView(context: vscode.ExtensionContext): vscode.WebviewPanel {
   return webviewPanel;
 }
 
-function getRicherPrompt(command: string) {
+function getRicherPrompt(command: string, codeToSend: string) {
+  if (!codeToSend) throw new Error("Code to send is empty!");
+
   switch (command) {
     case "improveDesign":
-      return "Acting as a senior developer, can you improve the design of the following code";
+      return `Acting as a senior developer, can you improve the design of the following code: ${codeToSend}`;
     case "optimizeCode":
-      return "Acting as a senior developer, can you optimize the following code";
+      return `Acting as a senior developer, can you optimize the following code: ${codeToSend}`;
 
     default:
-      vscode.window.showWarningMessage("Unknown action");
+      `Improve the following code: ${codeToSend}`;
       break;
   }
 }
 
 function handleWebviewMessage(
   message: WebviewMessage,
-  webview: vscode.Webview,
   context: vscode.ExtensionContext
 ) {
   try {
-    let richerPrompt = getRicherPrompt(message.command);
+    console.log(message);
+    if (!message || !message.code) throw new Error("No code to send!");
+
+    const richerPrompt = getRicherPrompt(message.command, message.code);
 
     updateProgressIndicator("Analyzing code...");
 
-    setupClientWebSocket(context)
-      .then((clientSocket) => {
-        richerPrompt = `${richerPrompt}: ${message.code}`;
-        sendPromptToEngine(clientSocket, richerPrompt);
+    gptClient
+      ?.getResponse(richerPrompt!)
+      .then(async (response) => {
+        console.log(response);
+
+        updateContent(response, context);
       })
       .catch((error) => {
-        vscode.window.showErrorMessage(
-          `Client could not be available: ${error}`
-        );
+        vscode.window.showErrorMessage(`Client failed: ${error}`);
       });
   } catch (error) {
-    vscode.window.showWarningMessage(`Unable to update the output: ${error}`);
+    vscode.window.showErrorMessage(`Unable to update the output: ${error}`);
   }
-}
-
-function sendPromptToEngine(clientSocket: WebSocket, code: string | undefined) {
-  if (!code) {
-    console.error("Attempted to send undefined code");
-    return;
-  }
-
-  clientSocket.send(code);
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -188,20 +112,23 @@ export function activate(context: vscode.ExtensionContext) {
       if (editor) {
         const codeToSend = editor.document.getText(editor.selection);
 
-        startEngine()
-          .then(async (result) => {
-            console.log(result);
+        if (!gptClient) {
+          gptClient = new GPTClient(process.env.OPENAI_API_KEY || "");
+        }
 
-            updateProgressIndicator("Analyzing code...");
-            const clientSocket = await setupClientWebSocket(context);
+        updateProgressIndicator("Analyzing code...");
 
-            sendPromptToEngine(clientSocket, codeToSend);
+        gptClient
+          .getResponse(codeToSend)
+          .then(async (response) => {
+            console.log(response);
+
+            updateContent(response, context);
           })
           .catch((error) => {
             vscode.window.showErrorMessage(
               `Engine could not be started: ${error}`
             );
-            return;
           });
       }
     }
@@ -210,9 +137,4 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable);
 }
 
-export function deactivate(clientSocket: WebSocket) {
-  stopEngine();
-  if (clientSocket?.readyState === WebSocket.OPEN) {
-    clientSocket.close();
-  }
-}
+export function deactivate(clientSocket: WebSocket) {}
