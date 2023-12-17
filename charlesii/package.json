@@ -3,6 +3,8 @@
   "displayName": "CharlesII",
   "description": "AI-powered coding assistant that provide real-time coding support, insights, and interactions using a LLM ChatGPT-like model.",
   "version": "0.0.1",
+  "license": "ISC",
+  "publisher": "marlex",
   "repository": {
     "type": "git",
     "url": "https://github.com/marlecce/charlesII.git"
@@ -14,6 +16,9 @@
     "Other"
   ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:extension.activate"
+  ],
   "contributes": {
     "commands": [
       {
@@ -55,10 +60,15 @@
     "mocha": "^10.2.0",
     "ts-loader": "^9.5.0",
     "typescript": "^5.2.2",
+    "vsce": "^2.15.0",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "@charlesII/engine": "file:../engine/dist",
+    "bufferutil": "^4.0.8",
+    "pm2": "^5.3.0",
+    "utf-8-validate": "^6.0.3",
     "ws": "^8.14.2"
   }
 }
