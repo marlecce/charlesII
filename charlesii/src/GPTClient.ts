@@ -1,4 +1,6 @@
 import { OpenAI } from "openai";
+import * as vscode from "vscode";
+import { EXTENSION_NAME } from "./constants";
 
 export class GPTClient {
   private openai: OpenAI;
@@ -9,10 +11,20 @@ export class GPTClient {
 
   async getResponse(prompt: string): Promise<string> {
     try {
+      const model =
+        (vscode.workspace
+          .getConfiguration(EXTENSION_NAME)
+          .get("gpt.model") as string) || "text-davinci-003";
+
+      const maxTokens =
+        (vscode.workspace
+          .getConfiguration(EXTENSION_NAME)
+          .get("gpt.maxTokens") as number) || 150;
+
       const response = await this.openai.completions.create({
-        model: "text-davinci-003",
+        model,
         prompt: prompt,
-        max_tokens: 150,
+        max_tokens: maxTokens,
       });
       return response.choices[0].text.trim();
       // return `Yo the response is: ${new Date()}`;

@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import WebSocket from "ws";
 import { getWebviewContent } from "./webview-content";
-// import { startEngine, stopEngine } from "./engine-utils";
 import { GPTClient } from "./GPTClient";
+import { EXTENSION_NAME } from "./constants";
 
 let gptClient: GPTClient | null = null;
 let currentPanel: vscode.WebviewPanel | undefined = undefined;
@@ -36,7 +36,7 @@ function updateContent(content: string, context: vscode.ExtensionContext) {
 function createWebView(context: vscode.ExtensionContext): vscode.WebviewPanel {
   let webviewPanel = vscode.window.createWebviewPanel(
     "codeActions",
-    "CharlesII",
+    EXTENSION_NAME,
     vscode.ViewColumn.Beside,
     { enableScripts: true }
   );
@@ -82,15 +82,18 @@ function handleWebviewMessage(
   context: vscode.ExtensionContext
 ) {
   try {
-    console.log(message);
     if (!message || !message.code) throw new Error("No code to send!");
 
     const richerPrompt = getRicherPrompt(message.command, message.code);
 
     updateProgressIndicator("Analyzing code...");
 
+    if (!gptClient) {
+      throw new Error("GPTClient not initialized");
+    }
+
     gptClient
-      ?.getResponse(richerPrompt!)
+      .getResponse(richerPrompt!)
       .then(async (response) => {
         console.log(response);
 
@@ -113,7 +116,11 @@ export function activate(context: vscode.ExtensionContext) {
         const codeToSend = editor.document.getText(editor.selection);
 
         if (!gptClient) {
-          gptClient = new GPTClient(process.env.OPENAI_API_KEY || "");
+          const apiKey = vscode.workspace
+            .getConfiguration("yourExtensionName")
+            .get("openai.apiKey") as string;
+
+          gptClient = new GPTClient(apiKey);
         }
 
         updateProgressIndicator("Analyzing code...");

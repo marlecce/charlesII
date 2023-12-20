@@ -5,6 +5,7 @@
   "version": "0.0.1",
   "license": "ISC",
   "publisher": "marlex",
+  "icon": "images/charlesii.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/marlecce/charlesII.git"
@@ -34,7 +35,34 @@
           "group": "navigation"
         }
       ]
-    }
+    },
+    "configuration": [
+      {
+        "title": "CharlesII",
+        "properties": {
+          "CharlesII.openai.apiKey": {
+            "type": "string",
+            "default": "",
+            "description": "OpenAI API Key"
+          },
+          "CharlesII.gpt.model": {
+            "type": "string",
+            "default": "text-davinci-003",
+            "enum": [
+              "text-davinci-003",
+              "other-model-1",
+              "other-model-2"
+            ],
+            "description": "GPT Model"
+          },
+          "CharlesII.gpt.maxTokens": {
+            "type": "number",
+            "default": 150,
+            "description": "Maximum Tokens"
+          }
+        }
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
